@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,9 +8,70 @@
       rel="stylesheet"
       href="{{ url_for('static', filename='style.css') }}"
     />
+    <style>
+      /*  Add some basic styling here for the loading indicator */
+      #loading-indicator {
+        display: none; /* Hidden by default */
+        text-align: center;
+        margin-top: 20px;
+        font-style: italic;
+        color: #888;
+      }
+    </style>
   </head>
   <body>
-    <h1>SOL/GMT Candlestick Chart</h1>
-    <div id="chart-container">{{ chart | safe }}</div>
+    <div class="container">
+      <h1>SOL/GMT Candlestick Chart</h1>
+
+      <div class="controls">
+        <label for="daysBack">Days Back:</label>
+        <input
+          type="number"
+          id="daysBack"
+          name="daysBack"
+          value="90"
+          min="1"
+          max="365"
+        />
+        <button onclick="loadChart('1d')">Daily</button>
+        <button onclick="loadChart('1h')">Hourly</button>
+      </div>
+
+      <div id="loading-indicator">Loading...</div>
+
+      <div id="chart-container">
+        <!-- Chart will be loaded here -->
+      </div>
+    </div>
+
+    <script>
+      function loadChart(interval) {
+        let daysBack = document.getElementById("daysBack").value;
+        let url = `/chart?interval=${interval}&days_back=${daysBack}`;
+
+        // Show loading indicator
+        document.getElementById("loading-indicator").style.display = "block";
+        document.getElementById("chart-container").innerHTML = ""; // Clear previous chart
+
+        fetch(url)
+          .then((response) => response.text())
+          .then((data) => {
+            // Hide loading indicator
+            document.getElementById("loading-indicator").style.display = "none";
+            document.getElementById("chart-container").innerHTML = data;
+          })
+          .catch((error) => {
+            // Hide loading indicator and display error
+            document.getElementById("loading-indicator").style.display = "none";
+            document.getElementById("chart-container").innerHTML =
+              '<div class="error">Error loading chart.</div>';
+            console.error("Fetch error:", error);
+          });
+      }
+
+      window.onload = function () {
+        loadChart("1d");
+      };
+    </script>
   </body>
 </html>

@@ -5,23 +5,36 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.io as pio
 import yfinance as yf
-from flask import Flask, render_template
+from dotenv import load_dotenv  # Import load_dotenv
+from flask import Flask, render_template, request
+
+load_dotenv()  # Load environment variables from .env
 
 app = Flask(__name__)
 
 
-def get_sol_gmt_data(days_back=90):  # Fetch data for the last 'days_back' days.
-    """Fetches historical data, calculates SOL/GMT, returns Plotly figure."""
+def get_sol_gmt_data(interval="1d", days_back=90):
+    """Fetches historical data with specified interval and days back."""
 
-    end_date = datetime.date.today()
-    start_date = end_date - datetime.timedelta(days=days_back)
+    if interval == "1d":
+        end_date = datetime.date.today()
+        start_date = end_date - datetime.timedelta(days=days_back)
+    elif interval == "1h":
+        end_date = datetime.datetime.now()  # Use datetime for hourly
+        start_date = end_date - datetime.timedelta(hours=days_back * 24)
+    else:
+        return None  # Invalid Interval
 
     try:
-        sol_data = yf.download("SOL-USD", start=start_date, end=end_date)
-        gmt_data = yf.download("GMT-USD", start=start_date, end=end_date)
+        sol_data = yf.download(
+            "SOL-USD", start=start_date, end=end_date, interval=interval
+        )
+        gmt_data = yf.download(
+            "GMT18069-USD", start=start_date, end=end_date, interval=interval
+        )
 
         if sol_data.empty or gmt_data.empty:
-            return None  # Or handle the error appropriately
+            return None
 
         sol_data, gmt_data = sol_data.align(gmt_data, join="inner", axis=0)
 
@@ -31,7 +44,7 @@ def get_sol_gmt_data(days_back=90):  # Fetch data for the last 'days_back' days.
         sol_gmt_data["Low"] = sol_data["Low"] / gmt_data["Low"]
         sol_gmt_data["Close"] = sol_data["Close"] / gmt_data["Close"]
         sol_gmt_data["Volume"] = sol_data["Volume"]
-        sol_gmt_data.index.name = "Date"  # Ensure 'Date' is the index name
+        sol_gmt_data.index.name = "Date"
 
         return sol_gmt_data
     except Exception as e:
@@ -39,9 +52,9 @@ def get_sol_gmt_data(days_back=90):  # Fetch data for the last 'days_back' days.
         return None
 
 
-def create_candlestick_chart(data):
-    """Creates a Plotly candlestick chart from the given data."""
-    if data is None:  # Handle the case where data fetching failed.
+def create_candlestick_chart(data, interval):
+    """Creates a Plotly candlestick chart."""
+    if data is None:
         return "<div>Error: Could not fetch data.</div>"
 
     fig = go.Figure(
@@ -58,31 +71,44 @@ def create_candlestick_chart(data):
     )
 
     fig.update_layout(
-        title="SOL/GMT Candlestick Chart",
+        title=f"SOL/GMT Candlestick Chart ({interval})",  # Include interval in title
         xaxis_title="Date",
         yaxis_title="Price (SOL/GMT)",
-        xaxis_rangeslider_visible=False,  # Remove the rangeslider
+        xaxis_rangeslider_visible=False,
     )
-
-    # Convert the Plotly figure to an HTML div
     chart_div = pio.to_html(fig, full_html=False)
     return chart_div
 
 
 @app.route("/")
 def index():
-    """Main route. Fetches data, creates chart, renders template."""
-    sol_gmt_data = get_sol_gmt_data()
-    chart_html = create_candlestick_chart(sol_gmt_data)
-    return render_template("index.html", chart=chart_html)
+    """Default route, shows daily chart."""
+    return render_template("index.html", interval="1d")
+
+
+@app.route("/chart")
+def chart():
+    """Route to handle chart requests with interval parameter."""
+    interval = request.args.get(
+        "interval", "1d"
+    )  # Get interval from query parameter, default to '1d'
+    days_back_str = request.args.get(
+        "days_back", "90"
+    )  # Get from query parameter, default 90
+    try:
+        days_back = int(days_back_str)
+    except ValueError:
+        days_back = 90
+
+    sol_gmt_data = get_sol_gmt_data(interval=interval, days_back=days_back)
+    chart_html = create_candlestick_chart(sol_gmt_data, interval)
+    return chart_html
 
 
 if __name__ == "__main__":
-    # For local testing, use:
-    # app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
-
-    # Use for Render or Heroku:
+    # Use environment variables for port and debug mode
+    port = int(os.environ.get("PORT", 5000))  # Get port from .env, default to 5000
     if os.environ.get("FLASK_ENV") == "production":
-        app.run(debug=False)
+        app.run(debug=False, host="0.0.0.0", port=port)  # For Render/Heroku
     else:
-        app.run(debug=True)
+        app.run(debug=True, host="0.0.0.0", port=port)  # For local use.
