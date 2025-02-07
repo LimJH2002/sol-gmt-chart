@@ -1,0 +1,9 @@
+body {
+  font-family: sans-serif;
+  margin: 20px;
+}
+
+#chart-container {
+  width: 90%; /* Or any desired width */
+  margin: 0 auto;
+}
