@@ -93,7 +93,7 @@ def chart():
         "interval", "1d"
     )  # Get interval from query parameter, default to '1d'
     days_back_str = request.args.get(
-        "days_back", "90"
+        "days_back", "360"
     )  # Get from query parameter, default 90
     try:
         days_back = int(days_back_str)
